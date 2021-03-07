@@ -25,9 +25,23 @@ using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 using namespace std::literals::chrono_literals;
 
+std::vector<int> ReadIndices(const char* file_name)
+{
+    std::vector<int> indices;
+    std::ifstream in_indices(file_name, std::ios::in);
+    std::string s;
+    while (std::getline(in_indices, s)) // 逐行读取数据并存于s中，直至数据全部读取
+    {
+        indices.push_back(std::atoi(s.c_str()));
+    }
+
+    return indices;
+}
 
 bool DeleteFacesByVertexIndices(Mesh& sm, const std::vector<int>& idx)
 {
+    sm.collect_garbage();
+
     const auto num_vertices = sm.num_vertices();
     // loop through all given indices.
     for (auto i : idx)
@@ -39,9 +53,16 @@ bool DeleteFacesByVertexIndices(Mesh& sm, const std::vector<int>& idx)
         }
 
         // get vertex_descriptor;
-        auto vd = *(sm.vertices().first + i);
+        //auto vd = *(sm.vertices().first + i);
+        auto vd = sm_vertex_descriptor(i);
+        std::cout << vd << std::endl;
+        if (vd == sm.null_vertex())
+            continue;
         // get halfedge_descriptor;
         auto hed = sm.halfedge(vd);
+        if (hed == sm.null_halfedge())
+            continue;
+
         // get all halfedges around vertex;
         auto heds = sm.halfedges_around_target(hed);
 
@@ -69,12 +90,16 @@ bool DeleteFacesByVertexIndices(Mesh& sm, const std::vector<int>& idx)
 
 int main(int argc, char **argv)
 {
+    const char* indices_file = "data/indices.txt";
+    const char* mesh_file = "data/mesh_test.off";
+
+    auto idx = ReadIndices(indices_file);
 
     Mesh sm;
     std::filebuf fb;
 
     time_point<Clock> start = Clock::now();
-    if (!fb.open ("data/Scan.off",std::ios::in))
+    if (!fb.open (mesh_file,std::ios::in))
     {
         return EXIT_FAILURE;
     }
@@ -103,9 +128,9 @@ int main(int argc, char **argv)
 
     printHelper("before remove face");
 
-    // for demo purpose
-    std::vector<int> idx(100000);
-    std::generate(idx.begin(), idx.end(), [](){ static int i = 0; return i++; });
+    //// for demo purpose
+    //std::vector<int> idx(100000);
+    //std::generate(idx.begin(), idx.end(), [](){ static int i = 0; return i++; });
 
     start = Clock::now();
 
