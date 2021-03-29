@@ -5,13 +5,19 @@ from collections import OrderedDict
 import tkinter as tk
 from tkinter import ttk
 
+from SimpleTFIDF import *
 
 class TFIDFApp:
 
-    def __init__(self, doc_strings, file_names):
+    def __init__(self, doc_strings, file_names, dict_tf_idf, dict_df, tfidf_vec_dict):
 
         self.doc_strings = doc_strings
         self.file_names = file_names
+        self.dict_tf_idf = dict_tf_idf
+        self.dict_df = dict_df
+        self.tfidf_vec_dict = tfidf_vec_dict
+        self.number_of_documents = len(self.file_names)
+        self.labels = []
 
         self.root = tk.Tk()
         self.root.title('Homework 1 App by Jiawei Sun(500409987)')
@@ -33,6 +39,7 @@ class TFIDFApp:
         self.tree_view.pack()
         self.FillUpTreeview(doc_strings, file_names)
         self.tree_view.bind("<Double-1>", self.OnSelectionChanged)
+        tk.Scrollbar(self.lt_frame, orient = tk.VERTICAL).config(command = self.tree_view)
 
 
         # right-top frame
@@ -70,6 +77,21 @@ class TFIDFApp:
     # update left-bottom frame
     def UpdateQueryResult(self, idx):
 
+        # query
+        query_tf_idf = GetQueryTFIDF(self.dict_tf_idf, self.dict_df, self.doc_strings[idx], self.number_of_documents)
+
+        # get sorted results
+        sorted_result = GetRanking(query_tf_idf, self.tfidf_vec_dict, metric = "cosine")
+
+        # create string to show:
+        show_string = "Query result for ### " + str(idx) + "\t ### (" + self.file_names[idx] + "):\n"
+
+        for i in range(20):
+            show_string += "\n Rank "+ str(i) +": ###\t" + str(sorted_result[i][0]) + "\t### label: " + self.labels[sorted_result[i][0]] + "\t### Score: " + "{:.7f}".format(sorted_result[i][1]) + "\n"
+
+        # update to query result view
+        self.query_result_view.delete(1.0, "end")
+        self.query_result_view.insert(1.0, show_string)
 
         return
     
@@ -90,8 +112,8 @@ class TFIDFApp:
         self.tree_view.heading("file name", text="name",anchor=tk.W)
 
         # get folder names
-        labels = list(map(lambda x : os.path.normpath(x).split(os.path.sep)[-2], file_names))
-        folder_names = list(OrderedDict.fromkeys(labels))
+        self.labels = list(map(lambda x : os.path.normpath(x).split(os.path.sep)[-2], file_names))
+        folder_names = list(OrderedDict.fromkeys(self.labels))
         folder_name_dict = { n : i for i, n in enumerate(folder_names) }
 
         # insert folders
@@ -101,8 +123,8 @@ class TFIDFApp:
     
         # loop through file_names, append them to correct folder
         for i in range(len(file_names)):
-            fi = folder_name_dict[labels[i]]
-            self.tree_view.insert(folders[fi], index = "end", text = str(i), values=(labels[i], os.path.basename(file_names[i])))
+            fi = folder_name_dict[self.labels[i]]
+            self.tree_view.insert(folders[fi], index = "end", text = str(i), values=(self.labels[i], os.path.basename(file_names[i])))
 
 
 

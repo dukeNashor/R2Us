@@ -3,6 +3,8 @@ import io
 import re
 import math
 
+from time import time
+
 from collections import defaultdict, OrderedDict
 from functools import reduce
 
@@ -39,8 +41,8 @@ def TFIDFProcessor(word_dicts):
     unique_words = reduce(lambda x, y: (x | y.keys()), word_dicts, set())
 
     # initialize tf and df dict
-    dict_tf = OrderedDict({ key : defaultdict(int) for key in unique_words })
-    dict_df = OrderedDict({ key : 0 for key in unique_words })
+    dict_tf = { key : defaultdict(int) for key in unique_words }
+    dict_df = { key : 0 for key in unique_words }
 
     # fill up the tf and df
     for idx, dict in enumerate(word_dicts):
@@ -64,10 +66,15 @@ def TFIDFProcessor(word_dicts):
             dict_tf_idf[word][doc_idx] = (1 + math.log(tf)) * math.log(len(word_dicts) / dict_df[word])
 
 
-    tfidf_vec_dict = {}
+    tfidf_vec_list = []
 
     for idx, doc in enumerate(word_dicts):
-        tfidf_vec_dict[idx] = GetQueryTFIDF(dict_tf_idf, dict_df, doc, len(word_dicts))
+        start = time()
+        tfidf_vec_list.append(GetQueryTFIDF(dict_tf_idf, dict_df, doc, len(word_dicts)))
+        end = time()
+        print("calculation for doc #", idx, " time:", end - start)
+
+    tfidf_vec_dict = { i : d for i, d in enumerate(tfidf_vec_list) }
 
     return dict_tf_idf, dict_df, tfidf_vec_dict
 
@@ -79,9 +86,9 @@ def GetQueryTFIDF(dict_tf_idf, dict_df, query, number_of_documents):
     if type(query) is defaultdict:
         words_occurences = query.copy() # shallow copy
     
-    query_tf_idf = OrderedDict({key: 0 for key in dict_tf_idf.keys()})
+    query_tf_idf = {key: 0 for key in dict_tf_idf.keys()}
 
-    for word in query_tf_idf.keys():
+    for word in words_occurences.keys():
 
         if words_occurences[word] == 0:
             continue
@@ -111,7 +118,6 @@ def GetRanking(query_tfidf, db_tfidf, metric = "cosine"):
     for idx, entry in db_tfidf.items():
         distance = CalculateDistance(query_tfidf, entry, metric = metric)
         result.append((idx, distance))
-        print("#", idx, "distance:", distance)
 
     # sort in descending or ascending order, based on the metric:
     return sorted(result, key = lambda x: x[1], reverse = (metric == "cosine"))
