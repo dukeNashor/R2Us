@@ -3,9 +3,12 @@ import os
 from collections import OrderedDict
 
 import tkinter as tk
+from tkinter import scrolledtext
 from tkinter import ttk
 
 from SimpleTFIDF import *
+
+g_number_of_results = 50
 
 class TFIDFApp:
 
@@ -21,12 +24,11 @@ class TFIDFApp:
 
         self.root = tk.Tk()
         self.root.title('Homework 1 App by Jiawei Sun(500409987)')
-        self.root.geometry("1200x900")
-        self.root.maxsize(1200, 900)
+        self.root.geometry("1200x1000")
         self.root.config(bg="skyblue")
 
         # initialize frames
-        self.lt_frame = tk.Frame(self.root, width=400, height=600)
+        self.lt_frame = tk.Frame(self.root, width=400, height=400)
         self.lt_frame.grid(row=0, column=0, padx=10, pady=5)
         self.rt_frame = tk.Frame(self.root, width=500, height=300)
         self.rt_frame.grid(row=0, column=1, padx=10, pady=5)
@@ -39,19 +41,20 @@ class TFIDFApp:
         self.tree_view.pack()
         self.FillUpTreeview(doc_strings, file_names)
         self.tree_view.bind("<Double-1>", self.OnSelectionChanged)
-        tk.Scrollbar(self.lt_frame, orient = tk.VERTICAL).config(command = self.tree_view)
-
+        self.query_button = tk.Button(self.rt_frame, text = "Start Query", command = self.UpdateQueryResult, bg='#e8b015')
+        self.query_button.pack()
 
         # right-top frame
-        tk.Label(self.rt_frame, text = "Query text", padx=10, pady=5).pack()
-        self.query_view = tk.Text(self.rt_frame, height=30, width=50)
+        tk.Label(self.rt_frame, text = "Query text\n(you can also type in text and click\n*Start Query* button to query your text)", padx=10, pady=5).pack()
+        self.query_view = tk.scrolledtext.ScrolledText(self.rt_frame, height=30, width=50)
         self.query_view.pack()
     
         # left-bottom frame
         tk.Label(self.lb_frame, text = "Query result", padx=10, pady=5).pack()
-        self.query_result_view = tk.Text(self.lb_frame, height=40, width=100)
+        self.query_result_view = tk.scrolledtext.ScrolledText(self.lb_frame, height=30, width=100)
         self.query_result_view.pack()
 
+        # start event loop
         self.root.mainloop()
 
     
@@ -66,7 +69,7 @@ class TFIDFApp:
         idx = int(idx_str)
 
         self.UpdateQueryView(idx)
-        self.UpdateQueryResult(idx)
+        self.UpdateQueryResult()
         return
         
     # update right-top frame
@@ -75,19 +78,24 @@ class TFIDFApp:
         self.query_view.insert(1.0, self.doc_strings[idx])
 
     # update left-bottom frame
-    def UpdateQueryResult(self, idx):
+    def UpdateQueryResult(self):
+
+        query_document = self.query_view.get("1.0", tk.END)
+        if (query_document == "\n"):
+            print("query is empty")
+            return
 
         # query
-        query_tf_idf = GetQueryTFIDF(self.dict_tf_idf, self.dict_df, self.doc_strings[idx], self.number_of_documents)
+        query_tf_idf = GetQueryTFIDF(self.dict_tf_idf, self.dict_df, query_document, self.number_of_documents)
 
         # get sorted results
         sorted_result = GetRanking(query_tf_idf, self.tfidf_vec_dict, metric = "cosine")
 
         # create string to show:
-        show_string = "Query result for ### " + str(idx) + "\t ### (" + self.file_names[idx] + "):\n"
+        show_string = " Query result\n"
 
-        for i in range(20):
-            show_string += "\n Rank "+ str(i) +": ###\t" + str(sorted_result[i][0]) + "\t### label: " + self.labels[sorted_result[i][0]] + "\t### Score: " + "{:.7f}".format(sorted_result[i][1]) + "\n"
+        for i in range(g_number_of_results):
+            show_string += "\n Rank "+ str(i + 1) +": ###\t" + str(sorted_result[i][0]) + "\t### label: " + self.labels[sorted_result[i][0]] + "\t### Score: " + "{:.7f}".format(sorted_result[i][1]) + "\n"
 
         # update to query result view
         self.query_result_view.delete(1.0, "end")

@@ -18,10 +18,6 @@ def main():
     number_of_documents = len(word_dicts)
     dict_tf_idf, dict_df, tfidf_vec_dict = TFIDFProcessor(word_dicts)
 
-    # test
-    # query_tf_idf = GetQueryTFIDF(dict_tf_idf, dict_df, word_dicts[1], number_of_documents)
-    # sorted_result = GetRanking(query_tf_idf, tfidf_vec_dict, metric = "cosine")
-
     TFIDFApp(doc_strings, file_names, dict_tf_idf, dict_df, tfidf_vec_dict)
 
 

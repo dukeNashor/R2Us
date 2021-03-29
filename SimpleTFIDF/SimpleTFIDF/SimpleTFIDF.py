@@ -28,8 +28,9 @@ def DocumentProcessor(doc_text):
         if w in g_stop_words:
             continue
 
-        # update dict
-        word_dict[w] += 1
+        if w.isalpha():
+            # update dict
+            word_dict[w] += 1
 
     return word_dict
 

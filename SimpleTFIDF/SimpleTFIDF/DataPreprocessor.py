@@ -5,8 +5,6 @@ from functools import reduce
 import urllib.request
 import tarfile
 
-
-
 # helper function to download data from web and
 # extract it to ./data;
 # if use_complete_group is True, then 20_newsgroups is downloaded;
@@ -63,7 +61,6 @@ def FetchData(use_complete_group = True):
 # presupposed data format;
 # The headers do not retain a fixed order, so we use regex to find matches,
 # and read files from the bottom to get the document string by number of lines.
-
 
 # get all file names in directory, including subfolders;
 def GetFilesInDir(dir_name):
