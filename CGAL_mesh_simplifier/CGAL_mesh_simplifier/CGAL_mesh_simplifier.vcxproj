@@ -133,7 +133,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>H:\dev\libraries\CGAL-5.1.2_release\include;H:\dev\libraries\boost_1_75_0;H:\dev\libraries\CGAL-5.1.2_release\include;H:\dev\libraries\CGAL-5.1.2_release\auxiliary\gmp\include;H:\dev\libraries\eigen-3.3.9;</AdditionalIncludeDirectories>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Disabled</Optimization>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

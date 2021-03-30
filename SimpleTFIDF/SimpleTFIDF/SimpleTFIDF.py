@@ -8,7 +8,6 @@ from time import time
 from collections import defaultdict, OrderedDict
 from functools import reduce
 
-from scipy.sparse import csr_matrix
 import numpy
 
 g_re_string = r"\W+|_|'|\""
@@ -119,6 +118,8 @@ def GetRanking(query_tfidf, db_tfidf, metric = "cosine"):
     for idx, entry in db_tfidf.items():
         distance = CalculateDistance(query_tfidf, entry, metric = metric)
         result.append((idx, distance))
+
+    result = list(filter(lambda x: not math.isnan(x[1]), result))
 
     # sort in descending or ascending order, based on the metric:
     return sorted(result, key = lambda x: x[1], reverse = (metric == "cosine"))

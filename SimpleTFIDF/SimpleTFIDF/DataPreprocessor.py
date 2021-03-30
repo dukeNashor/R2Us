@@ -144,6 +144,10 @@ def ProcessEntry(file_name):
         f.close()
         return "", []
 
+    if not number_of_lines_found:
+        print("line number did not found for", file_name, "using full text..")
+        doc_string = open(file_name, 'r').read()
+
     return doc_string, group_label
 
 
