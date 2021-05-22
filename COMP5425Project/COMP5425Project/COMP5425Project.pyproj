@@ -23,38 +23,28 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="algorithms\SketchClassification.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="preprocess.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="algorithms\ObjectDetection.py" />
     <Compile Include="assets\sbirmainwindow.py" />
     <Compile Include="main.py" />
     <Compile Include="SBIR.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="SketchClassification\alexnet.py" />
-    <Compile Include="SketchClassification\AlexNetModel.py" />
-    <Compile Include="SketchClassification\filelist_data_loader.py" />
-    <Compile Include="SketchClassification\resnet.py" />
-    <Compile Include="SketchClassification\ResNetModel.py" />
-    <Compile Include="SketchClassification\sketchanet.py" />
-    <Compile Include="SketchClassification\SketchANetModel.py" />
-    <Compile Include="SketchClassification\Tools\GetImageMean_Std.py" />
-    <Compile Include="SketchClassification\Tools\ListAllImageName.py" />
-    <Compile Include="SketchClassification\Tools\SplitDataset.py" />
-    <Compile Include="SketchClassification\Train.py" />
-    <Compile Include="test_quickdraw.py">
+    <Compile Include="utils.py">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="algorithms\" />
     <Folder Include="assets\" />
-    <Folder Include="SketchClassification\" />
-    <Folder Include="SketchClassification\Tools\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="assets\sbirmainwindow.ui" />
-    <Content Include="SketchClassification\.gitignore" />
-    <Content Include="SketchClassification\README.md" />
-    <Content Include="SketchClassification\resume_train.sh" />
-    <Content Include="SketchClassification\run_train.sh" />
-    <Content Include="SketchClassification\Tools\create_filelist.sh" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

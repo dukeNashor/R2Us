@@ -349,3 +349,6 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 SimpleTFIDF/SimpleTFIDF/data/
+COMP5425Project/data/
+COMP5425Project/trained_models/
+COMP5425Project/Cache/
