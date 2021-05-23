@@ -38,10 +38,12 @@ class Canvas(QWidget):
         sizePolicy.setHeightForWidth(self.sizePolicy().hasHeightForWidth())
         self.setSizePolicy(sizePolicy)
 
+        self.label = "None"
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.drawPixmap(self.rect(), self.image)
+        painter.drawText(300, 300, self.label)
 
 
     def mousePressEvent(self, event):
@@ -53,7 +55,7 @@ class Canvas(QWidget):
     def mouseMoveEvent(self, event):
         if event.buttons() and Qt.LeftButton and self.drawing:
             painter = QPainter(self.image)
-            painter.setPen(QPen(Qt.red, 3, Qt.SolidLine))
+            painter.setPen(QPen(Qt.black, 5, Qt.SolidLine))
             painter.drawLine(self.lastPoint, event.pos())
             self.lastPoint = event.pos()
             self.update()
@@ -72,6 +74,9 @@ class Canvas(QWidget):
     def GetImage(self):
         return QPixmap(self.image)
 
+    def GetLabel(self):
+        return self.label
+
 from torchvision import transforms
 # subclassed to allow classifier to work
 class ClassifierCanvas(Canvas):
@@ -83,18 +88,27 @@ class ClassifierCanvas(Canvas):
         self.transform = transforms.Compose([ transforms.ToPILImage(),
                                               transforms.Resize(224),
                                               transforms.ToTensor()])
+
+        
         # initialize to avoid slow first pass.
-        self.classifier(self.transform(torch.rand(3, 224, 224)).unsqueeze(0).to(g_device))
+        #self.classifier(self.transform(torch.rand(3, 224, 224)).unsqueeze(0).to(g_device))
+        self.classifier.Predict(np.zeros((1, 64, 64, 1)))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.drawing = True
             self.lastPoint = event.pos()
-            arr = QPixmapToNumpy(self.image, channels_count = 3)
-            arr = self.transform(arr).to(g_device)
-            pred = self.classifier(arr.unsqueeze(0))
+            qimage = self.image.toImage()
+            qimage.invertPixels()
+            qimage = qimage.scaled(64, 64).convertToFormat(QImage.Format_Grayscale8)
+            #qimage.save("invert.png")
+            arr = QImageToNumpy(qimage)
+            pred = self.classifier.Predict(np.expand_dims(arr, axis = 0))
+
             idx = pred.argmax(1).item()
+            label = self.idx_to_class[idx]
             print(self.idx_to_class[idx])
+            self.label = label
 
 
 class PaintWidget(QWidget):
@@ -154,6 +168,8 @@ class MovingObject(QGraphicsRectItem):
         if self.draw_bound:
             painter.drawRect(self.rect())
 
+    def GetRect(self):
+        return self.rect()
 
 
 class ObjectView(QGraphicsView):
@@ -210,18 +226,23 @@ class ObjectView(QGraphicsView):
 
 
 from algorithms.SketchClassification import SketchClassifier, SketchTransferClassifier, GetTrainedClassifier
+from algorithms.SketchClassificationV2_MobileNet import MobileNetSketchClassifier, GetTrainedClassifier
+from utils import COCO_INSTANCE_CATEGORY_NAMES
+from algorithms.Retriever import Retriever
 
 class UIManager():
 
     def __init__(self, ui):
         # classifier
-        self.classifier, self.idx_to_class = GetTrainedClassifier()
+        self.classifier, self.idx_to_class, self.class_to_idx = GetTrainedClassifier()
 
         self.object_id = 0
 
         self.ui = ui
         self.ui.canvas = ClassifierCanvas(parent = ui.groupBox, classifier = self.classifier, idx_to_class = self.idx_to_class)
         ui.groupBox.layout().insertWidget(0, self.ui.canvas)
+        ui.groupBox.setStyleSheet("background-color:grey;")
+
 
         self.ui.frame_selected = PaintWidget(parent = ui.groupBox_2)
         ui.groupBox_2.layout().insertWidget(0, self.ui.frame_selected)
@@ -243,10 +264,17 @@ class UIManager():
         self.ui.actionLoad_Data.triggered.connect(lambda _: self.LoadData())
 
         self.ui.object_list_view.currentItemChanged.connect(lambda _: self.ObjectListViewSelectionChanged())
-        
+        self.ui.btn_query.clicked.connect(lambda _: self.Query())
+
         self.ui.actionLoad_sketches.triggered.connect(lambda _: self.LoadSketch())
         self.ui.picked_list_view.itemClicked.connect(lambda _: self.PickedListViewSelectionChanged())
+        self.ui.picked_list_view.itemDoubleClicked.connect(lambda _: self.InsertPickedToObjectList())
         self.ui.btn_add_picked.clicked.connect(lambda _:self.InsertPickedToObjectList())
+        
+        self.LoadProcessedDataImpl("./data/val2017_preprocessed.pkl")
+        self.LoadSketchImpl("./data/sketchnet_selected")
+        self.coco_idx_class_dict = dict(zip(range(len(COCO_INSTANCE_CATEGORY_NAMES)), COCO_INSTANCE_CATEGORY_NAMES))
+        self.coco_class_idx_dict = dict((v,k) for k,v in self.coco_idx_class_dict.items())
 
     def LoadData(self):
         fname = QFileDialog.getOpenFileName(None, 'Open file', './data',"Pickle files (*.pkl)")
@@ -263,6 +291,8 @@ class UIManager():
             self.data_dict = pickle.load(f)
 
         print("Loaded {} images.".format(len(self.data_dict)))
+        self.retriever = Retriever(self.data_dict, self.idx_to_class)
+
 
     def LoadSketch(self):
         dir_name = QFileDialog.getExistingDirectory(None, 'Open Sketch root folder', './data')
@@ -324,9 +354,11 @@ class UIManager():
     def InsertDrawingToObjectList(self):
         olv = self.ui.object_list_view
         image = self.ui.canvas.GetImage()
+        label = self.ui.canvas.GetLabel()
+
         li = QtWidgets.QListWidgetItem(parent = None)
         li.setData(ROLE_UID, self.object_id)
-        li.setData(ROLE_SHOWTEXT, "object #{}".format(self.object_id))
+        li.setData(ROLE_SHOWTEXT, "{}".format(label))
         li.setData(ROLE_SKETCH, image)
         li.setData(ROLE_RECT, thumb_pos)
         li.setText(li.data(ROLE_SHOWTEXT))
@@ -361,3 +393,63 @@ class UIManager():
         image = current_selected.data(ROLE_SKETCH)
         self.ui.frame_selected.SetImage(image)
         self.ui.object_view.SetCurrentSelected(current_selected)
+
+    # build up query object
+    def Query(self):
+        olv = self.ui.object_list_view
+        num_objects = olv.count()
+        rect_dict = self.ui.object_view.item_dict
+
+        hits = []
+
+        for i in range(num_objects):
+            item = olv.item(i)
+            label = item.data(ROLE_SHOWTEXT)
+            # skip if not exist
+            if (label not in self.coco_class_idx_dict):
+                continue
+            hits.append(i)
+
+        nhit = len(hits)
+        query_dict = { "boxes":   np.zeros((nhit, 4)),
+                       "labels":  np.zeros((nhit), dtype = np.int64),
+                       "scores":  np.zeros((nhit)),
+                       "centers": np.zeros((nhit, 2))}
+
+
+        # loop for each row of model
+        c = 0
+        for i in hits:
+            item = olv.item(i)
+            label = item.data(ROLE_SHOWTEXT)
+            uid = item.data(ROLE_UID)
+            rect = item.data(ROLE_RECT)
+            image = item.data(ROLE_SKETCH)
+            mo = rect_dict[uid]
+            rect = mo.GetRect()
+            pos = mo.pos()
+
+            # x1, y1, x2, y2
+            query_dict["boxes"][c, 0] = rect.topLeft().x() + pos.x()
+            query_dict["boxes"][c, 1] = rect.topLeft().y() + pos.y()
+            query_dict["boxes"][c, 2] = rect.bottomRight().x() + pos.x()
+            query_dict["boxes"][c, 3] = rect.bottomRight().y()+ pos.y()
+            
+            query_dict["labels"][c] = self.coco_class_idx_dict[label]
+            query_dict["scores"][c] = 1.0
+            query_dict["centers"][c, 0] = round((query_dict["boxes"][c, 0] + query_dict["boxes"][c, 2]) * 0.5)
+            query_dict["centers"][c, 1] = round((query_dict["boxes"][c, 1] + query_dict["boxes"][c, 3]) * 0.5)
+
+
+            #print("#{}: x: {}, y: {}".format(uid, pos.x(), pos.y()))
+            c = c + 1
+
+        self.retriever.Query(query_dict)
+
+
+    def GetDisplayImage(self, img_path):
+        if img_path is None or not os.path.exists(img_path):
+            return np.zeros((400, 400))
+
+        o = self.data_dict[img_path]
+        return GetBoxImage(im, o["boxes"], o["labels"], o["scores"])

@@ -23,6 +23,12 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="algorithms\SketchClassificationV2_MobileNet.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="algorithms\Retriever.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="algorithms\SketchClassification.py">
       <SubType>Code</SubType>
     </Compile>
