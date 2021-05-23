@@ -21,6 +21,8 @@ SKETCH_HEIGHT = 400
 
 thumb_pos = QRect(0, 0, 200, 200)
 
+QUERY_RECT = (0, 0, 600, 450)
+
 class Canvas(QWidget):
 
     def __init__(self, *args, **kwargs):
@@ -178,7 +180,7 @@ class ObjectView(QGraphicsView):
         self.scene = QGraphicsScene()
         self.setScene(self.scene)
         self.setMinimumSize(QtCore.QSize(640, 480))
-        self.setSceneRect(0, 0, 620, 460)
+        self.setSceneRect(*QUERY_RECT)
 
         self.item_model = item_model
         
@@ -271,7 +273,7 @@ class UIManager():
         self.ui.picked_list_view.itemDoubleClicked.connect(lambda _: self.InsertPickedToObjectList())
         self.ui.btn_add_picked.clicked.connect(lambda _:self.InsertPickedToObjectList())
         
-        self.LoadProcessedDataImpl("./data/val2017_preprocessed.pkl")
+        self.LoadProcessedDataImpl("./data/coco_preprocessed.pkl")
         self.LoadSketchImpl("./data/sketchnet_selected")
         self.coco_idx_class_dict = dict(zip(range(len(COCO_INSTANCE_CATEGORY_NAMES)), COCO_INSTANCE_CATEGORY_NAMES))
         self.coco_class_idx_dict = dict((v,k) for k,v in self.coco_idx_class_dict.items())
@@ -292,6 +294,22 @@ class UIManager():
 
         print("Loaded {} images.".format(len(self.data_dict)))
         self.retriever = Retriever(self.data_dict, self.idx_to_class)
+
+        #query_width = QUERY_RECT[2]
+        #query_height = QUERY_RECT[3]
+
+        #from PIL import Image
+        
+        #for k, v in self.data_dict.items():
+        #    im = Image.open(k)
+        #    v["scaled_centers"] = np.zeros(v["centers"].shape)
+        #    v["width"] = im.size[0]
+        #    v["height"] = im.size[1]
+        #    v["scaled_centers"][:, 0] = v["centers"][:, 0] * query_width / v["width"]
+        #    v["scaled_centers"][:, 1] = v["centers"][:, 1] * query_height / v["height"]
+
+        #with open("./coco_preprocessed.pkl", "wb") as f:
+        #    pickle.dump(self.data_dict, f)
 
 
     def LoadSketch(self):
