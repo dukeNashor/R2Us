@@ -1,18 +1,20 @@
 import sys
 import os
+import pickle
+import random
+
+from utils import COCO_INSTANCE_CATEGORY_NAMES, GetBoxImage, QImageToNumpy
+from PIL import Image
+import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, QPoint, QVariant, QRect
 from PyQt5.QtWidgets import QWidget, QMainWindow, QApplication, QFileDialog
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QImage
 
-from utils import *
-import pickle
-import random
-
 ROLE_UID = Qt.UserRole + 1
 ROLE_SHOWTEXT = Qt.UserRole + 2
-ROLE_SKETCH = Qt.UserRole + 3
+ROLE_IMAGE = Qt.UserRole + 3
 ROLE_RECT = Qt.UserRole + 4
 ROLE_IMAGE_PATH = Qt.UserRole + 5
 
@@ -136,6 +138,10 @@ class PaintWidget(QWidget):
         if image is None:
             self.image = QPixmap(SKETCH_WIDTH, SKETCH_HEIGHT)
             self.image.fill(QColor(255, 255, 255))
+        elif isinstance(image, np.ndarray):
+            height, width, channel = image.shape
+            qimage = QImage(image.data, width, height, 3 * width, QImage.Format_RGB888)
+            self.image = QPixmap.fromImage(qimage)
         else:
             self.image = image
 
@@ -201,7 +207,7 @@ class ObjectView(QGraphicsView):
                 continue
             
             rect = self.item_model.data(idx, role = ROLE_RECT)
-            image = self.item_model.data(idx, role = ROLE_SKETCH)
+            image = self.item_model.data(idx, role = ROLE_IMAGE)
             self.item_dict[uid] = draggy = MovingObject(rect.x(), rect.y(), rect.width(), rect.height(), image = image)
             self.scene.addItem(draggy)
 
@@ -229,7 +235,6 @@ class ObjectView(QGraphicsView):
 
 from algorithms.SketchClassification import SketchClassifier, SketchTransferClassifier, GetTrainedClassifier
 from algorithms.SketchClassificationV2_MobileNet import MobileNetSketchClassifier, GetTrainedClassifier
-from utils import COCO_INSTANCE_CATEGORY_NAMES
 from algorithms.Retriever import Retriever
 
 class UIManager():
@@ -255,9 +260,15 @@ class UIManager():
         self.ui.frame_picked.setMinimumHeight(400)
 
         self.ui.object_view = ObjectView(self.ui.object_list_view.model())
-        self.ui.gridLayout_4.addWidget(self.ui.object_view, 2, 1)
+        self.ui.gridLayout_4.addWidget(self.ui.object_view, 2, 2)
         self.ui.object_list_view.model().rowsInserted.connect(lambda _: self.ui.object_view.UpdateObjects())
         self.ui.object_list_view.model().rowsRemoved.connect(lambda _: self.ui.object_view.UpdateObjects())
+
+        self.ui.frame_result = PaintWidget(parent = self.ui.centralwidget)
+        self.ui.gridLayout_4.addWidget(self.ui.frame_result, 4, 2)
+        self.ui.frame_result.setMinimumWidth(640)
+        self.ui.frame_result.setMinimumHeight(480)
+        self.ui.result_list_view.currentItemChanged.connect(lambda _: self.UpdateResultView())
 
         self.ui.btn_clear_canvas.clicked.connect(lambda _: self.ui.canvas.ClearCanvas())
         self.ui.btn_delete_object.clicked.connect(lambda _: self.DeleteObjectListItem())
@@ -273,10 +284,11 @@ class UIManager():
         self.ui.picked_list_view.itemDoubleClicked.connect(lambda _: self.InsertPickedToObjectList())
         self.ui.btn_add_picked.clicked.connect(lambda _:self.InsertPickedToObjectList())
         
-        self.LoadProcessedDataImpl("./data/coco_preprocessed.pkl")
-        self.LoadSketchImpl("./data/sketchnet_selected")
         self.coco_idx_class_dict = dict(zip(range(len(COCO_INSTANCE_CATEGORY_NAMES)), COCO_INSTANCE_CATEGORY_NAMES))
         self.coco_class_idx_dict = dict((v,k) for k,v in self.coco_idx_class_dict.items())
+        self.LoadProcessedDataImpl("./data/coco_preprocessed.pkl")
+        self.LoadSketchImpl("./data/sketchnet_selected")
+        
 
     def LoadData(self):
         fname = QFileDialog.getOpenFileName(None, 'Open file', './data',"Pickle files (*.pkl)")
@@ -293,7 +305,22 @@ class UIManager():
             self.data_dict = pickle.load(f)
 
         print("Loaded {} images.".format(len(self.data_dict)))
-        self.retriever = Retriever(self.data_dict, self.idx_to_class)
+        self.retriever = Retriever(self.data_dict, self.coco_idx_class_dict)
+
+        ## load image
+        #print("caching coco images..")
+        #for k, v in self.data_dict.items():
+        #    im = Image.open(k)
+        #    v["scaled_centers"] = np.zeros(v["centers"].shape)
+        #    v["width"] = im.size[0]
+        #    v["height"] = im.size[1]
+        #    v["box_image"] = GetBoxImage(img = k,
+        #                                 boxes = v["boxes"],
+        #                                 pred_cls = v["labels"],
+        #                                 cls_score = v["scores"],
+        #                                 scale = True)
+            
+        #print("complete..")
 
         #query_width = QUERY_RECT[2]
         #query_height = QUERY_RECT[3]
@@ -377,7 +404,7 @@ class UIManager():
         li = QtWidgets.QListWidgetItem(parent = None)
         li.setData(ROLE_UID, self.object_id)
         li.setData(ROLE_SHOWTEXT, "{}".format(label))
-        li.setData(ROLE_SKETCH, image)
+        li.setData(ROLE_IMAGE, image)
         li.setData(ROLE_RECT, thumb_pos)
         li.setText(li.data(ROLE_SHOWTEXT))
         olv.addItem(li)
@@ -391,7 +418,7 @@ class UIManager():
         li = QtWidgets.QListWidgetItem(parent = None)
         li.setData(ROLE_UID, self.object_id)
         li.setData(ROLE_SHOWTEXT, "{}".format(current_selected.text()))
-        li.setData(ROLE_SKETCH, image)
+        li.setData(ROLE_IMAGE, image)
         li.setData(ROLE_RECT, thumb_pos)
         li.setText(li.data(ROLE_SHOWTEXT))
         plv.addItem(li)
@@ -405,10 +432,10 @@ class UIManager():
             self.ui.frame_selected.SetImage(None)
             return
 
-        if current_selected.data(ROLE_SKETCH) is None:
+        if current_selected.data(ROLE_IMAGE) is None:
             return
 
-        image = current_selected.data(ROLE_SKETCH)
+        image = current_selected.data(ROLE_IMAGE)
         self.ui.frame_selected.SetImage(image)
         self.ui.object_view.SetCurrentSelected(current_selected)
 
@@ -442,7 +469,7 @@ class UIManager():
             label = item.data(ROLE_SHOWTEXT)
             uid = item.data(ROLE_UID)
             rect = item.data(ROLE_RECT)
-            image = item.data(ROLE_SKETCH)
+            image = item.data(ROLE_IMAGE)
             mo = rect_dict[uid]
             rect = mo.GetRect()
             pos = mo.pos()
@@ -462,12 +489,46 @@ class UIManager():
             #print("#{}: x: {}, y: {}".format(uid, pos.x(), pos.y()))
             c = c + 1
 
-        self.retriever.Query(query_dict)
+        results = self.retriever.Query(query_dict)
 
+        # update view
+        rlv = self.ui.result_list_view
+        rlv.clear()
+        for r in results:
+            li = QtWidgets.QListWidgetItem(parent = None)
+            img_path = r[0]
+            score = r[2]
+            li.setData(ROLE_SHOWTEXT, "{:.3f}: {}".format(score, os.path.basename(img_path)))
+            li.setText(li.data(ROLE_SHOWTEXT))
 
-    def GetDisplayImage(self, img_path):
-        if img_path is None or not os.path.exists(img_path):
-            return np.zeros((400, 400))
+            # get display image
+            #box_image = GetBoxImage(img = img_path,
+            #                        boxes = self.data_dict[img_path]["boxes"],
+            #                        pred_cls = self.data_dict[img_path]["labels"],
+            #                        cls_score = self.data_dict[img_path]["scores"],
+            #                        scale = True)
+            if "box_image" not in self.data_dict[img_path]:
+                self.data_dict[img_path]["box_image"] = GetBoxImage(img = img_path,
+                                                       boxes = self.data_dict[img_path]["boxes"],
+                                                       pred_cls = self.data_dict[img_path]["labels"],
+                                                       cls_score = self.data_dict[img_path]["scores"],
+                                                       scale = True)
 
-        o = self.data_dict[img_path]
-        return GetBoxImage(im, o["boxes"], o["labels"], o["scores"])
+            li.setData(ROLE_IMAGE, self.data_dict[img_path]["box_image"])
+            rlv.addItem(li)
+
+        if (len(results)) > 0:
+            rlv.setCurrentRow(0)
+
+    def UpdateResultView(self):
+        rlv = self.ui.result_list_view
+        current_selected = rlv.currentItem()
+        if current_selected is None:
+            self.ui.frame_result.SetImage(None)
+            return
+
+        if current_selected.data(ROLE_IMAGE) is None:
+            return
+
+        self.ui.frame_result.SetImage(current_selected.data(ROLE_IMAGE))
+

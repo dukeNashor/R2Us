@@ -7,6 +7,8 @@ import cv2
 from PIL import Image
 from matplotlib import pyplot as plt
 
+from math import floor
+
 COCO_INSTANCE_CATEGORY_NAMES = ['__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train',
                                'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign', 'parking meter',
                               'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
@@ -51,7 +53,7 @@ def QPixmapToTensor(pixmap):
     return torch.from_numpy(arr).permute(2, 0, 1).to(g_device)
 
 
-def GetBoxImage(img, boxes, pred_cls, cls_score):
+def GetBoxImage(img, boxes, pred_cls, cls_score = None, scale = False, scaled_size = (640, 480)):
     if isinstance(img, np.ndarray):
         image = np.array(img, copy = True)
     elif isinstance(img, str):
@@ -64,14 +66,35 @@ def GetBoxImage(img, boxes, pred_cls, cls_score):
                         pt2 = (round(boxes[i][2]), round(boxes[i][3])),
                         color = (0, 255, 0),
                         thickness = 1) 
+
+        if cls_score is not None:
+            score_txt = COCO_INSTANCE_CATEGORY_NAMES[pred_cls[i]] + " {:.3f}".format(cls_score[i].item())
+        else:
+            score_text = ""
+
         cv2.putText(img = image,
-                    text = COCO_INSTANCE_CATEGORY_NAMES[pred_cls[i]] + " {:.3f}".format(cls_score[i].item()),
+                    text = score_txt,
                     org = (round(boxes[i][0]), round(boxes[i][1])),
                     fontFace = cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale = 0.5,
                     color = (0, 255, 0),
                     thickness = 1) 
-    return image
+
+    if not scale:
+        return image
+
+    # scale
+    img_w = image.shape[1]
+    img_h = image.shape[0]
+    scale_w = scaled_size[0] / img_w
+    scale_h = scaled_size[1] / img_h
+    if scale_w < scale_h:
+        dim = (scaled_size[0], floor(scale_w * img_h))
+    else:
+        dim = (floor(scale_h * img_w), scaled_size[1])
+    
+    resized = cv2.resize(image, dim, interpolation = cv2.INTER_AREA)
+    return resized
 
 def PlotBoxes(img, boxes, pred_cls, cls_score):
     image = GetBoxImage(img, boxes, pred_cls, cls_score)

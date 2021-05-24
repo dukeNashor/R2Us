@@ -7,13 +7,14 @@ sys.path.insert(0, "../")
 import numpy as np
 from utils import GetBoxImage, PlotBoxes
 from utils import COCO_INSTANCE_CATEGORY_NAMES as coco_labels
-
+from numpy import linalg
 
 class Retriever():
     def __init__(self, data_dict, idx_to_class):
         self.data_dict = data_dict
         self.idx_to_class = idx_to_class
         self.CalculateCenters()
+        self.aspect_ratio = np.array([600, 450])
 
     def CalculateCenters(self):
 
@@ -64,15 +65,36 @@ class Retriever():
 
         ####### calculate distances
 
-        # center distance
+        final_result = []
+        # negative logarithm distance of scaled centers
+        for _ , imp in list_candidates:
+            t = self.data_dict[imp]
+            tls = self.data_dict[imp]["labels"]
+            qt, q_ind, t_ind = np.intersect1d(qls, tls, return_indices = True)
+            print("in {}".format(imp))
 
-        
+            score = 0.0
 
+            for i in range(len(q_ind)):
+                l = qls[q_ind[i]]
+                label = self.idx_to_class[l]
+                print("found {}".format(label))
 
+                # negative logarithm distance
+                center_q = query["centers"][q_ind[i], :]
+                center_t = t["scaled_centers"][t_ind[i], :]
+                diff = center_q - center_t
+                t_aspect_ratio = np.array([t["width"], t["height"]])
+                scaling_factor = np.true_divide(t_aspect_ratio, self.aspect_ratio)
+                dist = np.multiply(diff, scaling_factor)
+                normalized_dist = np.true_divide(dist, t_aspect_ratio)
 
+                nl_dist_score = -1.0 * np.log(linalg.norm(normalized_dist))
+                score += nl_dist_score
 
+            final_result.append((imp, len(q_ind), score))
 
+        # sort by number of coincident items, then by score.
+        final_result = sorted(final_result, key = lambda x: (x[1], x[2]), reverse = True)
 
-
-
-        pass
+        return final_result
